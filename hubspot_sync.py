@@ -3,15 +3,46 @@ import requests
 from datetime import datetime, timezone
 import pytz
 
-# === HubSpot setup ===
-HUBSPOT_API_KEY = os.getenv("HUBSPOT_API_KEY")
-SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
-HEADERS = {
-    "Authorization": f"Bearer {HUBSPOT_API_KEY}",
-    "Content-Type": "application/json"
-}
+# === Read config.env file ===
+def read_config():
+    config = {}
+    try:
+        with open("config.env", "r") as f:
+            for line in f:
+                if "=" in line:
+                    key, val = line.strip().split("=", 1)
+                    config[key] = val
+    except FileNotFoundError:
+        print("Config file not found. Exiting.")
+        exit(1)
+    return config
 
-def fetch_today_contacts():
+# === Schedule check ===
+def should_run_sync(schedule):
+    now = datetime.now(pytz.timezone('Australia/Sydney'))
+    weekday = now.weekday()  # Monday=0
+    day = now.day
+
+    if schedule == "Manual (Run Now)":
+        # Manual syncs are only run on-demand, so skip scheduled runs
+        return False
+    elif schedule == "Daily":
+        return True
+    elif schedule == "Weekly":
+        return weekday == 0  # Monday only
+    elif schedule == "Monthly":
+        return day == 1      # First day of month only
+    else:
+        return False
+
+# === HubSpot setup ===
+def fetch_today_contacts(hubspot_api_key):
+    SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
+    HEADERS = {
+        "Authorization": f"Bearer {hubspot_api_key}",
+        "Content-Type": "application/json"
+    }
+
     aest = pytz.timezone('Australia/Sydney')
     now_aest = datetime.now(aest)
     start_of_day_aest = now_aest.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -52,12 +83,10 @@ def fetch_today_contacts():
 
     return contacts
 
-
-def fetch_all_shared_dialpad_contacts():
-    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
+def fetch_all_shared_dialpad_contacts(dialpad_api_key):
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
-        "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Authorization": f"Bearer {dialpad_api_key}",
         "Content-Type": "application/json"
     }
     contacts = []
@@ -99,26 +128,19 @@ def build_dialpad_lookup(contacts):
 
     return email_to_contact, phone_to_contact
 
-def update_dialpad_contact(contact_id, payload):
-    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
+def update_dialpad_contact(contact_id, payload, dialpad_api_key):
     url = f"https://dialpad.com/api/v2/contacts/{contact_id}"
     headers = {
-        "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Authorization": f"Bearer {dialpad_api_key}",
         "Content-Type": "application/json"
     }
     res = requests.patch(url, headers=headers, json=payload)
     return res
 
-def push_to_dialpad(contacts, email_lookup, phone_lookup):
-    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
-    COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
-
-    if not DIALPAD_API_KEY:
-        raise ValueError("❌ DIALPAD_COOLBEANS_API_KEY not set in environment")
-
+def push_to_dialpad(contacts, email_lookup, phone_lookup, dialpad_api_key, company_id):
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
-        "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Authorization": f"Bearer {dialpad_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -145,9 +167,9 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
                 # Replace all existing numbers with the new phone number
                 contact_id = existing_contact.get("id")
                 update_payload = {
-                    "phones": [phone]  # append new phone
+                    "phones": [phone]
                 }
-                res = update_dialpad_contact(contact_id, update_payload)
+                res = update_dialpad_contact(contact_id, update_payload, dialpad_api_key)
                 if res.status_code == 200:
                     print(f"🔄 Updated phone for: {first_name} {last_name}")
                 else:
@@ -158,7 +180,7 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
 
         # If contact doesn't exist, create new one
         payload = {
-            "company_id": COMPANY_ID,
+            "company_id": company_id,
             "first_name": first_name,
             "last_name": last_name,
             "emails": [email] if email else [],
@@ -174,17 +196,47 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
         else:
             print(f"❌ Failed to create {first_name} {last_name}: {res.status_code} {res.text}")
 
+def main():
+    config = read_config()
+
+    schedule = config.get("SYNC_SCHEDULE", "Manual (Run Now)")
+    if not should_run_sync(schedule):
+        print(f"Skipping sync today because schedule is '{schedule}'.")
+        return
+
+    hubspot_api_key = config.get("HUBSPOT_API_KEY")
+    dialpad_api_key = config.get("DIALPAD_COOLBEANS_API_KEY")
+    dialpad_company_id = config.get("DIALPAD_COMPANY_ID")
+
+    if not (hubspot_api_key and dialpad_api_key and dialpad_company_id):
+        print("Missing API keys or Company ID in config. Exiting.")
+        return
+
+    print("Running sync process...")
+
+    try:
+        hubspot_contacts = fetch_today_contacts(hubspot_api_key)
+        print(f"Pulled {len(hubspot_contacts)} contacts from HubSpot")
+    except Exception as e:
+        print(f"Error fetching HubSpot contacts: {e}")
+        return
+
+    try:
+        dialpad_contacts = fetch_all_shared_dialpad_contacts(dialpad_api_key)
+        print(f"Fetched {len(dialpad_contacts)} shared contacts from Dialpad")
+    except Exception as e:
+        print(f"Error fetching Dialpad contacts: {e}")
+        return
+
+    email_lookup, phone_lookup = build_dialpad_lookup(dialpad_contacts)
+
+    push_to_dialpad(
+        hubspot_contacts,
+        email_lookup,
+        phone_lookup,
+        dialpad_api_key,
+        dialpad_company_id
+    )
 
 if __name__ == "__main__":
-    # Fetch HubSpot contacts created today
-    hubspot_contacts = fetch_today_contacts()
-    print(f"Pulled {len(hubspot_contacts)} contacts from HubSpot")
-
-    # Fetch all Dialpad shared contacts for deduplication and updates
-    dialpad_shared_contacts = fetch_all_shared_dialpad_contacts()
-    print(f"Fetched {len(dialpad_shared_contacts)} shared contacts from Dialpad")
-
-    email_lookup, phone_lookup = build_dialpad_lookup(dialpad_shared_contacts)
-
-    # Push new or updated contacts to Dialpad
-    push_to_dialpad(hubspot_contacts, email_lookup, phone_lookup)
+    main()
