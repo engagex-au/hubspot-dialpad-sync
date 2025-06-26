@@ -98,10 +98,6 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
         "Content-Type": "application/json"
     }
 
-    # Get full shared contacts for update check
-    existing_contacts = fetch_all_shared_dialpad_contacts(dialpad_api_key)
-    existing_lookup = {email.lower(): c for c in existing_contacts for email in (c.get("emails") or [])}
-
     added_count = 0
 
     for c in contacts:
@@ -114,29 +110,10 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
         if not email and not phone:
             continue
 
-        phone_type = "mobile" if phone.startswith("+614") else "work"
-
-        existing = existing_lookup.get(email)
-
-        if existing:
-            contact_id = existing.get("id")
-            existing_phones = existing.get("phones") or []
-
-            if phone and phone not in existing_phones:
-                update_payload = {
-                    "phones": [phone]
-                }
-                update_url = f"https://dialpad.com/api/v2/contacts/{contact_id}"
-                res = requests.patch(update_url, headers=headers, json=update_payload)
-                if res.status_code == 200:
-                    st.write(f"🔄 Updated phone for: {first_name} {last_name}")
-                else:
-                    st.error(f"❌ Failed to update phone for {first_name} {last_name}: {res.status_code} {res.text}")
-            else:
-                st.write(f"🔁 Skipping duplicate: {first_name} {last_name}")
+        if email in dialpad_emails or phone in dialpad_phones:
+            st.write(f"🔁 Skipping duplicate: {first_name} {last_name}")
             continue
 
-        # New contact
         payload = {
             "company_id": dialpad_company_id,
             "first_name": first_name,
@@ -165,26 +142,24 @@ def main():
     sync_schedule = st.selectbox("📅 Sync Schedule", ["Manual (Run Now)", "Daily", "Weekly", "Monthly"])
 
     if st.button("💾 Save Configuration"):
-    with open("config.env", "w") as f:
-        f.write(f"HUBSPOT_API_KEY={hubspot_api_key}\n")
-        f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
-        f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
-        f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
+        with open("config.env", "w") as f:
+            f.write(f"HUBSPOT_API_KEY={hubspot_api_key}\n")
+            f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
+            f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
+            f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
 
-    # Determine next scheduled run time
-    next_run_time = None
-    if sync_schedule == "Daily":
-        next_run_time = "tomorrow at 2:00 AM AEST"
-    elif sync_schedule == "Weekly":
-        next_run_time = "next Monday at 2:00 AM AEST"
-    elif sync_schedule == "Monthly":
-        next_run_time = "the 1st of next month at 2:00 AM AEST"
+        next_run_time = None
+        if sync_schedule == "Daily":
+            next_run_time = "tomorrow at 2:00 AM AEST"
+        elif sync_schedule == "Weekly":
+            next_run_time = "next Monday at 2:00 AM AEST"
+        elif sync_schedule == "Monthly":
+            next_run_time = "the 1st of next month at 2:00 AM AEST"
 
-    # Show user confirmation
-    if next_run_time:
-        st.success(f"✅ Configuration saved! Sync will run {next_run_time}.")
-    else:
-        st.success("✅ Configuration saved!")
+        if next_run_time:
+            st.success(f"✅ Configuration saved! Sync will run {next_run_time}.")
+        else:
+            st.success("✅ Configuration saved!")
 
     if sync_schedule == "Manual (Run Now)":
         if st.button("🚀 Run Sync Now"):
