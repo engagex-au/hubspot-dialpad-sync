@@ -57,6 +57,16 @@ def push_to_dialpad(contacts):
     DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")  # 🔁 correct secret name
     COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
 
+    # 🧪 One-time sanity check for debugging
+    if not DIALPAD_API_KEY:
+        raise ValueError("❌ DIALPAD_COOLBEANS_API_KEY not set in environment")
+
+    url = "https://api.dialpad.com/v2/company_contacts"
+    headers = {
+        "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
         "Authorization": f"Bearer {DIALPAD_API_KEY}",
