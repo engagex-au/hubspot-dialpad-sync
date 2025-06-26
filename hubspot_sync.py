@@ -70,31 +70,31 @@ def push_to_dialpad(contacts):
         "Content-Type": "application/json"
     }
 
-    for c in contacts:
-        props = c.get("properties", {})
-        first_name = props.get("firstname", "")
-        last_name = props.get("lastname", "")
-        email = props.get("email", "")
-        phone = props.get("phone", "")
-    
-        if not email and not phone:
-            continue
-    
+for c in contacts:
+    props = c.get("properties", {})
+    first_name = props.get("firstname", "")
+    last_name = props.get("lastname", "")
+    email = props.get("email", "")
+    phone = props.get("phone", "")
+
+    if not email and not phone:
+        continue
+
     payload = {
         "first_name": first_name,
         "last_name": last_name,
         "emails": [email] if email else [],
         "phones": [phone] if phone else []
     }
-    
-        print("➡️ Payload to Dialpad:")
-        print(payload)
-    
-        res = requests.post(url, headers=headers, json=payload)
-        if res.status_code == 200:
-            print(f"✅ Upserted: {first_name} {last_name}")
-        else:
-            print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
+
+    print("➡️ Payload to Dialpad:")
+    print(payload)
+
+    res = requests.post(url, headers=headers, json=payload)
+    if res.status_code == 200:
+        print(f"✅ Upserted: {first_name} {last_name}")
+    else:
+        print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
 
 
 # ✅ Final and only main block
