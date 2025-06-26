@@ -59,7 +59,7 @@ def push_to_dialpad(contacts):
 
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
-        "Authorization": f"Bearer {DIALPAD_COOLBEANS_API_KEY}",
+        "Authorization": f"Bearer {DIALPAD_API_KEY}",
         "Content-Type": "application/json"
     }
 
