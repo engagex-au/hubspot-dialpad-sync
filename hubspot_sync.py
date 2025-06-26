@@ -88,6 +88,9 @@ def push_to_dialpad(contacts):
             "phone_numbers": [phone] if phone else []
         }
 
+        print("➡️ Payload to Dialpad:")
+        print(payload)
+        
         res = requests.post(url, headers=headers, json=payload)
         if res.status_code == 200:
             print(f"✅ Upserted: {first_name} {last_name}")
