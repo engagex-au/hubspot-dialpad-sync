@@ -21,6 +21,6 @@ jobs:
     - name: Run script to fetch HubSpot contacts
       env:
         HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
-        DIALPAD_COOLBEANS_API_KEY: ${{ secrets.DIALPAD_COOLBEANS_API_KEY }}
+        DIALPAD_API_KEY: ${{ secrets.DIALPAD_COOLBEANS_API_KEY }}
         DIALPAD_COMPANY_ID: ${{ secrets.DIALPAD_COMPANY_ID }}
       run: python hubspot_sync.py
