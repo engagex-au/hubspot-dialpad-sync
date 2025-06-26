@@ -80,15 +80,13 @@ def push_to_dialpad(contacts):
         if not email and not phone:
             continue
     
-        payload = {
-            "first_name": first_name,
-            "last_name": last_name,
-            "emails": [email] if email else [],
-            "phone_numbers": [{
-                "type": "mobile" if phone.startswith("+614") else "work",
-                "value": phone
-            }] if phone else []
-        }
+    payload = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "phone_number": phone,
+        "phone_number_type": "mobile" if phone.startswith("+614") else "work"
+    }
     
         print("➡️ Payload to Dialpad:")
         print(payload)
