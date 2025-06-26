@@ -1,25 +1,20 @@
 import os
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import pytz
 
+# === HubSpot setup ===
 HUBSPOT_API_KEY = os.getenv("HUBSPOT_API_KEY")
 SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
-
 HEADERS = {
     "Authorization": f"Bearer {HUBSPOT_API_KEY}",
     "Content-Type": "application/json"
 }
 
 def fetch_today_contacts():
-    # Set timezone to AEST (UTC+10) — use Australia/Sydney for automatic daylight handling
     aest = pytz.timezone('Australia/Sydney')
-
-    # Get current date at 00:00 AEST
     now_aest = datetime.now(aest)
     start_of_day_aest = now_aest.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Convert to UTC for HubSpot
     start_of_day_utc = start_of_day_aest.astimezone(timezone.utc)
     start_of_day_iso = start_of_day_utc.isoformat()
 
@@ -56,25 +51,15 @@ def fetch_today_contacts():
         has_more = bool(after)
 
     return contacts
-import os
-import requests
-from datetime import datetime, timezone
-import pytz
 
-# HubSpot API setup and fetch_today_contacts() already here...
 
-def fetch_today_contacts():
-    # existing function to get HubSpot contacts
-    ...
-
-# 👇 Add this next — Step 2: push_to_dialpad()
 def push_to_dialpad(contacts):
-    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
+    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")  # 🔁 correct secret name
     COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
 
     url = "https://api.dialpad.com/v2/company_contacts"
     headers = {
-        "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Authorization": f"Bearer {DIALPAD_COOLBEANS_API_KEY}",
         "Content-Type": "application/json"
     }
 
@@ -102,14 +87,15 @@ def push_to_dialpad(contacts):
         else:
             print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
 
-# 👇 Then keep this at the bottom
+
+# ✅ Final and only main block
 if __name__ == "__main__":
     contacts = fetch_today_contacts()
     print(f"Pulled {len(contacts)} contacts from HubSpot")
-    push_to_dialpad(contacts)
 
-if __name__ == "__main__":
-    contacts = fetch_today_contacts()
+    # Optional: print for debug
     for c in contacts:
         props = c["properties"]
         print(f"{props.get('firstname', '')} {props.get('lastname', '')} | {props.get('email', '')} | {props.get('phone', '')}")
+
+    push_to_dialpad(contacts)
