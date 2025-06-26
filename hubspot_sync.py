@@ -60,12 +60,6 @@ def push_to_dialpad(contacts):
     # 🧪 One-time sanity check for debugging
     if not DIALPAD_API_KEY:
         raise ValueError("❌ DIALPAD_COOLBEANS_API_KEY not set in environment")
-
-    url = "https://api.dialpad.com/v2/company_contacts"
-    headers = {
-        "Authorization": f"Bearer {DIALPAD_API_KEY}",
-        "Content-Type": "application/json"
-    }
     
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
@@ -83,12 +77,12 @@ def push_to_dialpad(contacts):
         if not email and not phone:
             continue
 
-        payload = {
+             payload = {
             "company_id": COMPANY_ID,
             "first_name": first_name,
             "last_name": last_name,
-            "emails": [{"type": "work", "value": email}] if email else [],
-            "phone_numbers": [{"type": "work", "value": phone}] if phone else []
+            "emails": [email] if email else [],
+            "phone_numbers": [phone] if phone else []
         }
 
         res = requests.post(url, headers=headers, json=payload)
