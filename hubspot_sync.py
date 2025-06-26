@@ -41,10 +41,10 @@ def fetch_today_contacts():
     while has_more:
         if after:
             payload["after"] = after
-        
-        print("Payload being sent to Dialpad:")
+
+        print("Payload being sent to HubSpot:")
         print(payload)
-        
+
         res = requests.post(SEARCH_URL, headers=HEADERS, json=payload)
         res.raise_for_status()
         data = res.json()
@@ -55,54 +55,53 @@ def fetch_today_contacts():
 
     return contacts
 
-
 def push_to_dialpad(contacts):
-    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")  # 🔁 correct secret name
+    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
     COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
 
-    # 🧪 One-time sanity check for debugging
     if not DIALPAD_API_KEY:
         raise ValueError("❌ DIALPAD_COOLBEANS_API_KEY not set in environment")
-    
+
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
         "Authorization": f"Bearer {DIALPAD_API_KEY}",
         "Content-Type": "application/json"
     }
 
-for c in contacts:
-    props = c.get("properties", {})
-    first_name = props.get("firstname", "")
-    last_name = props.get("lastname", "")
-    email = props.get("email", "")
-    phone = props.get("phone", "")
+    for c in contacts:
+        props = c.get("properties", {})
+        first_name = props.get("firstname", "")
+        last_name = props.get("lastname", "")
+        email = props.get("email", "")
+        phone = props.get("phone", "")
 
-    if not email and not phone:
-        continue
+        if not email and not phone:
+            continue
 
-    payload = {
-        "first_name": first_name,
-        "last_name": last_name,
-        "emails": [email] if email else [],
-        "phones": [phone] if phone else []
-    }
+        # Set type = mobile if it starts with +614, otherwise work
+        phone_type = "mobile" if phone.startswith("+614") else "work"
 
-    print("➡️ Payload to Dialpad:")
-    print(payload)
+        payload = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "emails": [email] if email else [],
+            "phones": [phone] if phone else []
+        }
 
-    res = requests.post(url, headers=headers, json=payload)
-    if res.status_code == 200:
-        print(f"✅ Upserted: {first_name} {last_name}")
-    else:
-        print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
+        print("➡️ Payload to Dialpad:")
+        print(payload)
 
+        res = requests.post(url, headers=headers, json=payload)
+        if res.status_code == 200:
+            print(f"✅ Upserted: {first_name} {last_name}")
+        else:
+            print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
 
-# ✅ Final and only main block
+# ✅ Main block
 if __name__ == "__main__":
     contacts = fetch_today_contacts()
     print(f"Pulled {len(contacts)} contacts from HubSpot")
 
-    # Optional: print for debug
     for c in contacts:
         props = c["properties"]
         print(f"{props.get('firstname', '')} {props.get('lastname', '')} | {props.get('email', '')} | {props.get('phone', '')}")
