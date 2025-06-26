@@ -1,41 +1,38 @@
-name: Run HubSpot to Dialpad Sync
+name: HubSpot to Dialpad Sync
 
 on:
+  workflow_dispatch:  # Manual trigger option
   schedule:
-    - cron: '0 0 * * *' # Every day at 00:00 UTC → 10:00 AEST (adjust as needed)
-  workflow_dispatch: # allows you to run it manually from GitHub UI
+    # Daily at 2:00 AM AEST (which is 16:00 UTC the day before)
+    - cron: '0 16 * * *'
+    # Weekly on Monday at 2:00 AM AEST (which is Sunday 16:00 UTC)
+    - cron: '0 16 * * 0'
+    # Monthly on the 1st at 2:00 AM AEST (which is 16:00 UTC on the last day of the prior month)
+    - cron: '0 16 1 * *'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.10
+          python-version: 3.11
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Load Config File
+      - name: Create config.env from GitHub secrets
         run: |
-          echo "Using config.env for secrets"
-        env:
-          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
-          DIALPAD_COOLBEANS_API_KEY: ${{ secrets.DIALPAD_COOLBEANS_API_KEY }}
-          DIALPAD_COMPANY_ID: ${{ secrets.DIALPAD_COMPANY_ID }}
-
-      - name: Write config.env
-        run: |
-          echo "HUBSPOT_API_KEY=${{ secrets.HUBSPOT_API_KEY }}" >> config.env
+          echo "HUBSPOT_API_KEY=${{ secrets.HUBSPOT_API_KEY }}" > config.env
           echo "DIALPAD_COOLBEANS_API_KEY=${{ secrets.DIALPAD_COOLBEANS_API_KEY }}" >> config.env
           echo "DIALPAD_COMPANY_ID=${{ secrets.DIALPAD_COMPANY_ID }}" >> config.env
-          echo "SYNC_SCHEDULE=Daily" >> config.env  # GitHub Action will always use Daily
 
-      - name: Run Sync Script
+      - name: Run HubSpot to Dialpad sync
         run: python hubspot_sync.py
