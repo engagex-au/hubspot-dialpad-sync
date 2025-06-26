@@ -42,9 +42,6 @@ def fetch_today_contacts():
         if after:
             payload["after"] = after
 
-        print("Payload being sent to HubSpot:")
-        print(payload)
-
         res = requests.post(SEARCH_URL, headers=HEADERS, json=payload)
         res.raise_for_status()
         data = res.json()
@@ -55,7 +52,48 @@ def fetch_today_contacts():
 
     return contacts
 
-def push_to_dialpad(contacts):
+def fetch_all_shared_dialpad_contacts():
+    DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
+    url = "https://dialpad.com/api/v2/contacts"
+    headers = {
+        "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    contacts = []
+    params = {"limit": 100}
+    has_more = True
+    after = None
+
+    while has_more:
+        if after:
+            params["after"] = after
+        res = requests.get(url, headers=headers, params=params)
+        res.raise_for_status()
+        data = res.json()
+
+        # Filter only shared contacts
+        page_contacts = [c for c in data.get("results", []) if c.get("type") == "shared"]
+        contacts.extend(page_contacts)
+
+        after = data.get("paging", {}).get("next", {}).get("after")
+        has_more = bool(after)
+
+    return contacts
+
+def build_dialpad_lookup(contacts):
+    """Build lookup sets of existing emails and phones from Dialpad shared contacts."""
+    emails = set()
+    phones = set()
+
+    for c in contacts:
+        for email in c.get("emails", []) or []:
+            emails.add(email.lower())
+        for phone in c.get("phones", []) or []:
+            phones.add(phone)
+
+    return emails, phones
+
+def push_to_dialpad(contacts, dialpad_emails, dialpad_phones):
     DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
     COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
 
@@ -72,20 +110,26 @@ def push_to_dialpad(contacts):
         props = c.get("properties", {})
         first_name = props.get("firstname", "")
         last_name = props.get("lastname", "")
-        email = props.get("email", "")
+        email = props.get("email", "").lower()
         phone = props.get("phone", "")
 
         if not email and not phone:
             continue
 
-        # Set type = mobile if it starts with +614, otherwise work
+        # Skip if email or phone already in Dialpad shared contacts
+        if email in dialpad_emails or phone in dialpad_phones:
+            print(f"🔁 Skipping duplicate: {first_name} {last_name} (email or phone exists)")
+            continue
+
+        # Decide phone type
         phone_type = "mobile" if phone.startswith("+614") else "work"
 
         payload = {
+            "company_id": COMPANY_ID,
             "first_name": first_name,
             "last_name": last_name,
             "emails": [email] if email else [],
-            "phones": [phone] if phone else []
+            "phones": [{"type": phone_type, "value": phone}] if phone else []
         }
 
         print("➡️ Payload to Dialpad:")
@@ -97,13 +141,16 @@ def push_to_dialpad(contacts):
         else:
             print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
 
-# ✅ Main block
 if __name__ == "__main__":
-    contacts = fetch_today_contacts()
-    print(f"Pulled {len(contacts)} contacts from HubSpot")
+    # Fetch HubSpot contacts created today
+    hubspot_contacts = fetch_today_contacts()
+    print(f"Pulled {len(hubspot_contacts)} contacts from HubSpot")
 
-    for c in contacts:
-        props = c["properties"]
-        print(f"{props.get('firstname', '')} {props.get('lastname', '')} | {props.get('email', '')} | {props.get('phone', '')}")
+    # Fetch all Dialpad shared contacts for deduplication
+    dialpad_shared_contacts = fetch_all_shared_dialpad_contacts()
+    print(f"Fetched {len(dialpad_shared_contacts)} shared contacts from Dialpad")
 
-    push_to_dialpad(contacts)
+    dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_shared_contacts)
+
+    # Push only non-duplicates
+    push_to_dialpad(hubspot_contacts, dialpad_emails, dialpad_phones)
