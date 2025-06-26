@@ -76,21 +76,23 @@ def push_to_dialpad(contacts):
         last_name = props.get("lastname", "")
         email = props.get("email", "")
         phone = props.get("phone", "")
-
+    
         if not email and not phone:
             continue
-
+    
         payload = {
-            "company_id": COMPANY_ID,
             "first_name": first_name,
             "last_name": last_name,
             "emails": [email] if email else [],
-            "phone_numbers": [phone] if phone else []
+            "phone_numbers": [{
+                "type": "mobile" if phone.startswith("+614") else "work",
+                "value": phone
+            }] if phone else []
         }
-
+    
         print("➡️ Payload to Dialpad:")
         print(payload)
-        
+    
         res = requests.post(url, headers=headers, json=payload)
         if res.status_code == 200:
             print(f"✅ Upserted: {first_name} {last_name}")
