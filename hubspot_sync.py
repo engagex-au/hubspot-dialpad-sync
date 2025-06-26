@@ -41,7 +41,10 @@ def fetch_today_contacts():
     while has_more:
         if after:
             payload["after"] = after
-
+        
+        print("Payload being sent to Dialpad:")
+        print(payload)
+        
         res = requests.post(SEARCH_URL, headers=HEADERS, json=payload)
         res.raise_for_status()
         data = res.json()
