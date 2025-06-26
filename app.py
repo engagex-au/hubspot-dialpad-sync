@@ -165,11 +165,25 @@ def main():
     sync_schedule = st.selectbox("📅 Sync Schedule", ["Manual (Run Now)", "Daily", "Weekly", "Monthly"])
 
     if st.button("💾 Save Configuration"):
-        with open("config.env", "w") as f:
-            f.write(f"HUBSPOT_API_KEY={hubspot_api_key}\n")
-            f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
-            f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
-            f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
+    with open("config.env", "w") as f:
+        f.write(f"HUBSPOT_API_KEY={hubspot_api_key}\n")
+        f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
+        f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
+        f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
+
+    # Determine next scheduled run time
+    next_run_time = None
+    if sync_schedule == "Daily":
+        next_run_time = "tomorrow at 2:00 AM AEST"
+    elif sync_schedule == "Weekly":
+        next_run_time = "next Monday at 2:00 AM AEST"
+    elif sync_schedule == "Monthly":
+        next_run_time = "the 1st of next month at 2:00 AM AEST"
+
+    # Show user confirmation
+    if next_run_time:
+        st.success(f"✅ Configuration saved! Sync will run {next_run_time}.")
+    else:
         st.success("✅ Configuration saved!")
 
     if sync_schedule == "Manual (Run Now)":
