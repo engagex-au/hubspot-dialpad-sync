@@ -1,8 +1,10 @@
 import streamlit as st
 import requests
+import os
 from datetime import datetime, timezone
 import pytz
 
+# === Core Functions ===
 def fetch_today_contacts(hubspot_api_key):
     SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
     HEADERS = {
@@ -112,8 +114,6 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
             st.write(f"🔁 Skipping duplicate: {first_name} {last_name}")
             continue
 
-        phone_type = "mobile" if phone.startswith("+614") else "work"
-
         payload = {
             "company_id": dialpad_company_id,
             "first_name": first_name,
@@ -131,40 +131,58 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
 
     return added_count
 
+# === Streamlit Frontend ===
 def main():
     st.title("HubSpot to Dialpad Contact Sync")
 
-    hubspot_api_key = st.text_input("HubSpot API Key", type="password")
-    dialpad_api_key = st.text_input("Dialpad API Key", type="password")
-    dialpad_company_id = st.text_input("Dialpad Company ID")
+    hubspot_api_key = st.text_input("🔑 HubSpot API Key", type="password")
+    dialpad_api_key = st.text_input("🔐 Dialpad API Key", type="password")
+    dialpad_company_id = st.text_input("🏢 Dialpad Company ID")
 
-    if st.button("Run Sync"):
-        if not (hubspot_api_key and dialpad_api_key and dialpad_company_id):
-            st.error("Please enter all API keys and Company ID")
-            return
+    sync_schedule = st.selectbox("📅 Sync Schedule", ["Manual (Run Now)", "Daily", "Weekly", "Monthly"])
 
-        st.info("Fetching today's contacts from HubSpot...")
-        try:
-            hubspot_contacts = fetch_today_contacts(hubspot_api_key)
-            st.write(f"Pulled {len(hubspot_contacts)} contacts from HubSpot")
-        except Exception as e:
-            st.error(f"Error fetching HubSpot contacts: {e}")
-            return
+    if st.button("💾 Save Configuration"):
+        with open("config.env", "w") as f:
+            f.write(f"HUBSPOT_API_KEY={hubspot_api_key}\n")
+            f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
+            f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
+            f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
+        st.success("✅ Configuration saved!")
 
-        st.info("Fetching shared contacts from Dialpad for deduplication...")
-        try:
-            dialpad_contacts = fetch_all_shared_dialpad_contacts(dialpad_api_key)
-            st.write(f"Fetched {len(dialpad_contacts)} shared contacts from Dialpad")
-        except Exception as e:
-            st.error(f"Error fetching Dialpad contacts: {e}")
-            return
+    if sync_schedule == "Manual (Run Now)":
+        if st.button("🚀 Run Sync Now"):
+            if not (hubspot_api_key and dialpad_api_key and dialpad_company_id):
+                st.error("❌ Please enter all API keys and Company ID")
+                return
 
-        dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_contacts)
+            try:
+                st.info("📥 Fetching contacts from HubSpot...")
+                hubspot_contacts = fetch_today_contacts(hubspot_api_key)
+                st.write(f"Pulled {len(hubspot_contacts)} contacts from HubSpot")
+            except Exception as e:
+                st.error(f"❌ Error fetching HubSpot contacts: {e}")
+                return
 
-        st.info("Pushing new contacts to Dialpad...")
-        added = push_to_dialpad(hubspot_contacts, dialpad_api_key, dialpad_company_id, dialpad_emails, dialpad_phones)
+            try:
+                st.info("📤 Fetching shared contacts from Dialpad...")
+                dialpad_contacts = fetch_all_shared_dialpad_contacts(dialpad_api_key)
+                st.write(f"Fetched {len(dialpad_contacts)} shared contacts from Dialpad")
+            except Exception as e:
+                st.error(f"❌ Error fetching Dialpad contacts: {e}")
+                return
 
-        st.success(f"Sync completed! {added} new contacts added to Dialpad.")
+            dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_contacts)
+
+            st.info("🔄 Syncing new contacts...")
+            added = push_to_dialpad(
+                hubspot_contacts,
+                dialpad_api_key,
+                dialpad_company_id,
+                dialpad_emails,
+                dialpad_phones
+            )
+
+            st.success(f"✅ Sync complete: {added} new contacts added.")
 
 if __name__ == "__main__":
     main()
