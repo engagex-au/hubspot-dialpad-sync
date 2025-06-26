@@ -129,7 +129,7 @@ def push_to_dialpad(contacts, dialpad_emails, dialpad_phones):
             "first_name": first_name,
             "last_name": last_name,
             "emails": [email] if email else [],
-            "phones": [{"type": phone_type, "value": phone}] if phone else []
+            "phones": [phone] if phone else []
         }
 
         print("➡️ Payload to Dialpad:")
