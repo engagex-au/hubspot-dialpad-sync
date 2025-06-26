@@ -2,6 +2,8 @@ import os
 import requests
 from datetime import datetime, timezone
 import pytz
+from dotenv import load_dotenv
+load_dotenv("config.env")
 
 # === Read config.env file ===
 def read_config():
