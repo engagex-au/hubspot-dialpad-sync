@@ -141,11 +141,11 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
         if existing_contact:
             # Contact exists, check if phone needs update
             dialpad_phones = existing_contact.get("phones") or []
-            if phone and phone not in dialpad_phones:
-                # Update Dialpad contact with new phone
+            if phone and dialpad_phones != [phone]:
+                # Replace all existing numbers with the new phone number
                 contact_id = existing_contact.get("id")
                 update_payload = {
-                    "phones": dialpad_phones + [phone]  # append new phone
+                    "phones": [phone]  # append new phone
                 }
                 res = update_dialpad_contact(contact_id, update_payload)
                 if res.status_code == 200:
