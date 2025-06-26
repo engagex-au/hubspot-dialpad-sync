@@ -77,7 +77,7 @@ def push_to_dialpad(contacts):
         if not email and not phone:
             continue
 
-             payload = {
+        payload = {
             "company_id": COMPANY_ID,
             "first_name": first_name,
             "last_name": last_name,
