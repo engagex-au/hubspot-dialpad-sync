@@ -1,15 +1,10 @@
-name: Scheduled HubSpot-Dialpad Sync
+name: Daily HubSpot-Dialpad Sync
 
 on:
   schedule:
-    # Daily at 2 AM AEST (16:00 UTC previous day)
-    - cron: '0 16 * * *'  
-    # Weekly every Monday at 2 AM AEST (Sunday 16:00 UTC)
-    - cron: '0 16 * * 0'  
-    # Monthly on 1st at 2 AM AEST (30th/31st day 16:00 UTC previous month)
-    - cron: '0 16 30 * *'  
-
-  workflow_dispatch:  # Manual trigger
+    # Run at 2 AM AEST (UTC+10) every day
+    - cron: '0 16 * * *'
+  workflow_dispatch:  # allows manual triggering from GitHub UI
 
 jobs:
   sync:
@@ -19,7 +14,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
@@ -27,9 +22,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run sync script
-        env:
-          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
-          DIALPAD_COOLBEANS_API_KEY: ${{ secrets.DIALPAD_COOLBEANS_API_KEY }}
-          DIALPAD_COMPANY_ID: ${{ secrets.DIALPAD_COMPANY_ID }}
+      - name: Run Sync
         run: python hubspot_sync.py
