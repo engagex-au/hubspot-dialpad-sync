@@ -65,10 +65,9 @@ def fetch_all_shared_dialpad_contacts():
         "limit": 100,
         "include_local": "false"
     }
-    has_more = True
     cursor = None
 
-    while has_more:
+    while True:
         if cursor:
             params["cursor"] = cursor
 
@@ -76,24 +75,26 @@ def fetch_all_shared_dialpad_contacts():
         res.raise_for_status()
         data = res.json()
 
-        page_contacts = data.get("results", [])
-        contacts.extend(page_contacts)
+        shared_contacts = [c for c in data.get("items", []) if c.get("type") == "shared"]
+        contacts.extend(shared_contacts)
 
-        cursor = data.get("paging", {}).get("next", {}).get("cursor")
-        has_more = bool(cursor)
+        cursor = data.get("cursor")
+        if not cursor:
+            break
 
     return contacts
 
 def build_dialpad_lookup(contacts):
-    """Build sets of existing emails and phones from shared Dialpad contacts."""
     emails = set()
     phones = set()
 
     for c in contacts:
         for email in c.get("emails", []) or []:
-            emails.add(email.lower())
+            if email:
+                emails.add(email.strip().lower())
         for phone in c.get("phones", []) or []:
-            phones.add(phone)
+            if phone:
+                phones.add(phone.strip())
 
     return emails, phones
 
@@ -114,13 +115,12 @@ def push_to_dialpad(contacts, dialpad_emails, dialpad_phones):
         props = c.get("properties", {})
         first_name = props.get("firstname", "")
         last_name = props.get("lastname", "")
-        email = props.get("email", "").lower()
-        phone = props.get("phone", "")
+        email = props.get("email", "").strip().lower()
+        phone = props.get("phone", "").strip()
 
         if not email and not phone:
             continue
 
-        # Skip if duplicate
         if email in dialpad_emails or phone in dialpad_phones:
             print(f"🔁 Skipping duplicate: {first_name} {last_name}")
             continue
@@ -142,14 +142,14 @@ def push_to_dialpad(contacts, dialpad_emails, dialpad_phones):
         else:
             print(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
 
-# ✅ Main execution
+# === Main block
 if __name__ == "__main__":
     hubspot_contacts = fetch_today_contacts()
     print(f"Pulled {len(hubspot_contacts)} contacts from HubSpot")
 
-    dialpad_shared_contacts = fetch_all_shared_dialpad_contacts()
-    print(f"Fetched {len(dialpad_shared_contacts)} shared contacts from Dialpad")
+    dialpad_contacts = fetch_all_shared_dialpad_contacts()
+    print(f"Fetched {len(dialpad_contacts)} shared contacts from Dialpad")
 
-    dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_shared_contacts)
+    dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_contacts)
 
     push_to_dialpad(hubspot_contacts, dialpad_emails, dialpad_phones)
