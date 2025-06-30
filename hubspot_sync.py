@@ -159,7 +159,7 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
         phone = props.get("phone", "")
         lead_status = props.get("lead_status", "").lower()
 
-    print(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
+        print(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
     
         if DELETE_UNQUALIFIED and lead_status == "unqualified":
             # If unqualified and contact exists in Dialpad, delete it
