@@ -149,7 +149,7 @@ def main():
             f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
             f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
             f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
-            f.write(f"DELETE_UNQUALIFIED_CONTACTS={'true' if delete_unqualified else 'false'}\n")
+            f.write(f"DELETE_UNQUALIFIED={'true' if delete_unqualified else 'false'}\n")
 
         message = f"✅ Configuration saved! This job will run on schedule: "
         if sync_schedule == "Daily":
