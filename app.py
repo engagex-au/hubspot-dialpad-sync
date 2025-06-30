@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytz
 
 # === Core Functions ===
+
 def fetch_today_contacts(hubspot_api_key):
     SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
     HEADERS = {
@@ -30,7 +31,7 @@ def fetch_today_contacts(hubspot_api_key):
                 ]
             }
         ],
-        "properties": ["firstname", "lastname", "email", "phone"],
+        "properties": ["firstname", "lastname", "email", "phone", "hs_lead_status"],
         "limit": 100
     }
 
@@ -91,7 +92,7 @@ def build_dialpad_lookup(contacts):
 
     return emails, phones
 
-def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_emails, dialpad_phones):
+def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_emails, dialpad_phones, delete_unqualified=False):
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
         "Authorization": f"Bearer {dialpad_api_key}",
@@ -99,6 +100,7 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
     }
 
     added_count = 0
+    deleted_count = 0
 
     for c in contacts:
         props = c.get("properties", {})
@@ -106,6 +108,30 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
         last_name = props.get("lastname", "")
         email = props.get("email", "").lower()
         phone = props.get("phone", "")
+        lead_status = props.get("hs_lead_status", "").lower()
+
+        st.write(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
+
+        if delete_unqualified and lead_status == "unqualified":
+            if email in dialpad_emails:
+                try:
+                    search_res = requests.get(url, headers=headers, params={"email": email})
+                    search_res.raise_for_status()
+                    results = search_res.json().get("items", [])
+                    for contact in results:
+                        if contact.get("type") == "shared":
+                            contact_id = contact.get("id")
+                            del_res = requests.delete(f"{url}/{contact_id}", headers=headers)
+                            if del_res.status_code == 204:
+                                st.warning(f"🗑️ Deleted unqualified contact: {first_name} {last_name}")
+                                deleted_count += 1
+                            else:
+                                st.error(f"❌ Failed to delete: {del_res.status_code} {del_res.text}")
+                except Exception as e:
+                    st.error(f"❌ Error deleting contact: {e}")
+            else:
+                st.info(f"ℹ️ Unqualified contact not found in Dialpad: {first_name} {last_name}")
+            continue
 
         if not email and not phone:
             continue
@@ -124,14 +150,15 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
 
         res = requests.post(url, headers=headers, json=payload)
         if res.status_code == 200:
-            st.write(f"✅ Upserted: {first_name} {last_name}")
+            st.write(f"✅ Created: {first_name} {last_name}")
             added_count += 1
         else:
             st.error(f"❌ Failed for {first_name} {last_name}: {res.status_code} {res.text}")
 
-    return added_count
+    return added_count, deleted_count
 
 # === Streamlit Frontend ===
+
 def main():
     st.title("HubSpot to Dialpad Contact Sync")
 
@@ -140,7 +167,6 @@ def main():
     dialpad_company_id = st.text_input("🏢 Dialpad Company ID")
 
     sync_schedule = st.selectbox("📅 Sync Schedule", ["Manual (Run Now)", "Daily", "Weekly", "Monthly"])
-
     delete_unqualified = st.checkbox("🗑️ Delete Unqualified HubSpot Leads from Dialpad", value=False)
 
     if st.button("💾 Save Configuration"):
@@ -151,19 +177,8 @@ def main():
             f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
             f.write(f"DELETE_UNQUALIFIED={'true' if delete_unqualified else 'false'}\n")
 
-        message = f"✅ Configuration saved! This job will run on schedule: "
-        if sync_schedule == "Daily":
-            message += "Every day at 2:00 AM AEST."
-        elif sync_schedule == "Weekly":
-            message += "Every Monday at 2:00 AM AEST."
-        elif sync_schedule == "Monthly":
-            message += "On the 1st of every month at 2:00 AM AEST."
-        else:
-            message += "Only when manually triggered."
+        st.success("✅ Configuration saved!")
 
-        st.success(message)
-
-       # ✅ Display the contents of the saved config.env file (with masking)
         def mask_value(key, value):
             if "KEY" in key or "TOKEN" in key:
                 return f"{key}=***********"
@@ -174,7 +189,7 @@ def main():
             lines = f.readlines()
             masked_lines = [mask_value(*line.strip().split("=", 1)) for line in lines if "=" in line]
             st.code("\n".join(masked_lines), language="dotenv")
-    
+
     if sync_schedule == "Manual (Run Now)":
         if st.button("🚀 Run Sync Now"):
             if not (hubspot_api_key and dialpad_api_key and dialpad_company_id):
@@ -200,15 +215,16 @@ def main():
             dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_contacts)
 
             st.info("🔄 Syncing new contacts...")
-            added = push_to_dialpad(
+            added, deleted = push_to_dialpad(
                 hubspot_contacts,
                 dialpad_api_key,
                 dialpad_company_id,
                 dialpad_emails,
-                dialpad_phones
+                dialpad_phones,
+                delete_unqualified=delete_unqualified
             )
 
-            st.success(f"✅ Sync complete: {added} new contacts added.")
+            st.success(f"✅ Sync complete: {added} new contacts added, {deleted} contacts deleted.")
 
 if __name__ == "__main__":
     main()
