@@ -21,7 +21,6 @@ SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
 DIALPAD_CONTACTS_URL = "https://dialpad.com/api/v2/contacts"
 
 def should_run_today():
-    """Check if the script should run today based on SYNC_SCHEDULE."""
     aest = pytz.timezone("Australia/Sydney")
     today = datetime.now(aest)
 
@@ -36,7 +35,7 @@ def should_run_today():
     return False
 
 def fetch_today_contacts():
-    HEADERS = {
+    headers = {
         "Authorization": f"Bearer {HUBSPOT_API_KEY}",
         "Content-Type": "application/json"
     }
@@ -47,20 +46,14 @@ def fetch_today_contacts():
     start_of_day_utc = start_of_day_aest.astimezone(timezone.utc)
     start_of_day_iso = start_of_day_utc.isoformat()
 
-    # Fetch contacts created today (same as before)
     payload = {
-        "filterGroups": [
-            {
-                "filters": [
-                    {
-                        "propertyName": "createdate",
-                        "operator": "GTE",
-                        "value": start_of_day_iso
-                    }
-                ]
-            }
-        ],
-        # Include Lead Status property for deletion logic
+        "filterGroups": [{
+            "filters": [{
+                "propertyName": "createdate",
+                "operator": "GTE",
+                "value": start_of_day_iso
+            }]
+        }],
         "properties": ["firstname", "lastname", "email", "phone", "hs_lead_status"],
         "limit": 100
     }
@@ -72,7 +65,7 @@ def fetch_today_contacts():
     while has_more:
         if after:
             payload["after"] = after
-        res = requests.post(SEARCH_URL, headers=HEADERS, json=payload)
+        res = requests.post(SEARCH_URL, headers=headers, json=payload)
         res.raise_for_status()
         data = res.json()
         contacts.extend(data.get("results", []))
@@ -86,6 +79,7 @@ def fetch_all_shared_dialpad_contacts():
         "Authorization": f"Bearer {DIALPAD_API_KEY}",
         "Content-Type": "application/json"
     }
+
     contacts = []
     params = {"limit": 100}
     has_more = True
@@ -100,7 +94,6 @@ def fetch_all_shared_dialpad_contacts():
         res = requests.get(DIALPAD_CONTACTS_URL, headers=headers, params=params)
         res.raise_for_status()
         data = res.json()
-
         page_contacts = [c for c in data.get("items", []) if c.get("type") == "shared"]
         contacts.extend(page_contacts)
 
@@ -131,18 +124,28 @@ def update_dialpad_contact(contact_id, payload):
         "Authorization": f"Bearer {DIALPAD_API_KEY}",
         "Content-Type": "application/json"
     }
-    res = requests.patch(url, headers=headers, json=payload)
-    return res
+    return requests.patch(url, headers=headers, json=payload)
 
 def delete_dialpad_contact(contact_id):
     url = f"{DIALPAD_CONTACTS_URL}/{contact_id}"
     headers = {
         "Authorization": f"Bearer {DIALPAD_API_KEY}",
+        "Content-Type": "application/json"
     }
     res = requests.delete(url, headers=headers)
-    return res
 
-def push_to_dialpad(contacts, email_lookup, phone_lookup):
+    if res.status_code == 204:
+        return True
+    if res.status_code == 200:
+        try:
+            data = res.json()
+            if data.get("id") == contact_id:
+                return True
+        except Exception:
+            pass
+    return False
+
+def push_to_dialpad(hubspot_contacts, email_lookup, phone_lookup):
     headers = {
         "Authorization": f"Bearer {DIALPAD_API_KEY}",
         "Content-Type": "application/json"
@@ -151,7 +154,10 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
     added_count = 0
     deleted_count = 0
 
-    for c in contacts:
+    # Build a quick lookup set of emails from today's HubSpot fetch
+    todays_hubspot_emails = {c.get("properties", {}).get("email", "").lower() for c in hubspot_contacts}
+
+    for c in hubspot_contacts:
         props = c.get("properties", {})
         first_name = props.get("firstname", "")
         last_name = props.get("lastname", "")
@@ -160,21 +166,18 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
         lead_status = props.get("hs_lead_status", "").lower()
 
         print(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
-    
+
         if DELETE_UNQUALIFIED and lead_status == "unqualified":
-            # If unqualified and contact exists in Dialpad, delete it
-            existing_contact = email_lookup.get(email) if email else None
-            if existing_contact:
-                contact_id = existing_contact.get("id")
-                res = delete_dialpad_contact(contact_id)
-                if res.status_code == 204:
+            if email in email_lookup:
+                contact_id = email_lookup[email].get("id")
+                success = delete_dialpad_contact(contact_id)
+                if success:
                     print(f"🗑️ Deleted unqualified contact: {first_name} {last_name}")
                     deleted_count += 1
                 else:
-                    print(f"❌ Failed to delete {first_name} {last_name}: {res.status_code} {res.text}")
+                    print(f"❌ Failed to delete {first_name} {last_name}")
             else:
                 print(f"ℹ️ Unqualified contact not found in Dialpad: {first_name} {last_name}")
-            # Skip further processing for unqualified
             continue
 
         if not email and not phone:
@@ -186,10 +189,7 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
             dialpad_phones = existing_contact.get("phones") or []
             if phone and dialpad_phones != [phone]:
                 contact_id = existing_contact.get("id")
-                update_payload = {
-                    "phones": [phone]
-                }
-                res = update_dialpad_contact(contact_id, update_payload)
+                res = update_dialpad_contact(contact_id, {"phones": [phone]})
                 if res.status_code == 200:
                     print(f"🔄 Updated phone for: {first_name} {last_name}")
                 else:
