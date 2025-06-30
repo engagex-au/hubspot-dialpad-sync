@@ -163,10 +163,17 @@ def main():
 
         st.success(message)
 
-        # ✅ Display the contents of the saved config.env file
+       # ✅ Display the contents of the saved config.env file (with masking)
+        def mask_value(key, value):
+            if "KEY" in key or "TOKEN" in key:
+                return f"{key}=***********"
+            return f"{key}={value}"
+
         st.subheader("🔍 Saved config.env:")
         with open("config.env", "r") as f:
-            st.code(f.read(), language="dotenv")
+            lines = f.readlines()
+            masked_lines = [mask_value(*line.strip().split("=", 1)) for line in lines if "=" in line]
+            st.code("\n".join(masked_lines), language="dotenv")
     
     if sync_schedule == "Manual (Run Now)":
         if st.button("🚀 Run Sync Now"):
