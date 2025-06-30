@@ -15,7 +15,7 @@ HUBSPOT_API_KEY = os.getenv("HUBSPOT_API_KEY")
 DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
 DIALPAD_COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
 SYNC_SCHEDULE = os.getenv("SYNC_SCHEDULE", "Manual (Run Now)")
-DELETE_UNQUALIFIED = os.getenv("DELETE_UNQUALIFIED", "false").lower() == "true"
+DELETE_UNQUALIFIED = os.getenv("DELETE_UNQUALIFIED_CONTACTS", "false").lower() == "true"
 
 SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
 DIALPAD_CONTACTS_URL = "https://dialpad.com/api/v2/contacts"
