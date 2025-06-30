@@ -61,7 +61,7 @@ def fetch_today_contacts():
             }
         ],
         # Include Lead Status property for deletion logic
-        "properties": ["firstname", "lastname", "email", "phone", "lead_status"],
+        "properties": ["firstname", "lastname", "email", "phone", "hs_lead_status"],
         "limit": 100
     }
 
@@ -157,7 +157,7 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
         last_name = props.get("lastname", "")
         email = props.get("email", "").lower()
         phone = props.get("phone", "")
-        lead_status = props.get("lead_status", "").lower()
+        lead_status = props.get("hs_lead_status", "").lower()
 
         print(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
     
