@@ -33,6 +33,7 @@ jobs:
           echo "HUBSPOT_API_KEY=${{ secrets.HUBSPOT_API_KEY }}" > config.env
           echo "DIALPAD_COOLBEANS_API_KEY=${{ secrets.DIALPAD_COOLBEANS_API_KEY }}" >> config.env
           echo "DIALPAD_COMPANY_ID=${{ secrets.DIALPAD_COMPANY_ID }}" >> config.env
+          echo "DELETE_UNQUALIFIED=${{ secrets.DELETE_UNQUALIFIED_CONTACTS }}" >> config.env
 
       - name: Run HubSpot to Dialpad sync
         run: python hubspot_sync.py
