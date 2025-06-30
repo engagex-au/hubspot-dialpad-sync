@@ -8,14 +8,14 @@ from dotenv import load_dotenv
 load_dotenv("config.env")
 
 # Print current config state
-print("🛠️ Delete feature enabled:", os.getenv("DELETE_UNQUALIFIED_CONTACTS"))
+print("🛠️ Delete feature enabled:", os.getenv("DELETE_UNQUALIFIED"))
 
 # === Environment Variables ===
 HUBSPOT_API_KEY = os.getenv("HUBSPOT_API_KEY")
 DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
 DIALPAD_COMPANY_ID = os.getenv("DIALPAD_COMPANY_ID")
 SYNC_SCHEDULE = os.getenv("SYNC_SCHEDULE", "Manual (Run Now)")
-DELETE_UNQUALIFIED = os.getenv("DELETE_UNQUALIFIED_CONTACTS", "false").lower() == "true"
+DELETE_UNQUALIFIED = os.getenv("DELETE_UNQUALIFIED", "false").lower() == "true"
 
 SEARCH_URL = "https://api.hubapi.com/crm/v3/objects/contacts/search"
 DIALPAD_CONTACTS_URL = "https://dialpad.com/api/v2/contacts"
@@ -159,6 +159,8 @@ def push_to_dialpad(contacts, email_lookup, phone_lookup):
         phone = props.get("phone", "")
         lead_status = props.get("lead_status", "").lower()
 
+    print(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
+    
         if DELETE_UNQUALIFIED and lead_status == "unqualified":
             # If unqualified and contact exists in Dialpad, delete it
             existing_contact = email_lookup.get(email) if email else None
