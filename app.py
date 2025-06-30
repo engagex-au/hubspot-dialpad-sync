@@ -141,25 +141,27 @@ def main():
 
     sync_schedule = st.selectbox("📅 Sync Schedule", ["Manual (Run Now)", "Daily", "Weekly", "Monthly"])
 
+    delete_unqualified = st.checkbox("🗑️ Delete Unqualified HubSpot Leads from Dialpad", value=False)
+
     if st.button("💾 Save Configuration"):
         with open("config.env", "w") as f:
             f.write(f"HUBSPOT_API_KEY={hubspot_api_key}\n")
             f.write(f"DIALPAD_COOLBEANS_API_KEY={dialpad_api_key}\n")
             f.write(f"DIALPAD_COMPANY_ID={dialpad_company_id}\n")
             f.write(f"SYNC_SCHEDULE={sync_schedule}\n")
+            f.write(f"DELETE_UNQUALIFIED={'true' if delete_unqualified else 'false'}\n")
 
-        next_run_time = None
+        message = f"✅ Configuration saved! This job will run on schedule: "
         if sync_schedule == "Daily":
-            next_run_time = "tomorrow at 2:00 AM AEST"
+            message += "Every day at 2:00 AM AEST."
         elif sync_schedule == "Weekly":
-            next_run_time = "next Monday at 2:00 AM AEST"
+            message += "Every Monday at 2:00 AM AEST."
         elif sync_schedule == "Monthly":
-            next_run_time = "the 1st of next month at 2:00 AM AEST"
-
-        if next_run_time:
-            st.success(f"✅ Configuration saved! Sync will run {next_run_time}.")
+            message += "On the 1st of every month at 2:00 AM AEST."
         else:
-            st.success("✅ Configuration saved!")
+            message += "Only when manually triggered."
+
+        st.success(message)
 
     if sync_schedule == "Manual (Run Now)":
         if st.button("🚀 Run Sync Now"):
