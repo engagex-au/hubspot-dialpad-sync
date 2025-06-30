@@ -81,18 +81,18 @@ def fetch_all_shared_dialpad_contacts(dialpad_api_key):
     return contacts
 
 def build_dialpad_lookup(contacts):
-    emails = set()
-    phones = set()
+    email_map = {}
+    phone_map = {}
 
     for c in contacts:
         for email in c.get("emails") or []:
-            emails.add(email.lower())
+            email_map[email.lower()] = c
         for phone in c.get("phones") or []:
-            phones.add(phone)
+            phone_map[phone] = c
 
-    return emails, phones
+    return email_map, phone_map
 
-def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_emails, dialpad_phones, delete_unqualified=False):
+def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email_map, dialpad_phone_map, delete_unqualified=False):
     url = "https://dialpad.com/api/v2/contacts"
     headers = {
         "Authorization": f"Bearer {dialpad_api_key}",
@@ -113,22 +113,15 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
         st.write(f"➡️ Checking lead status for: {first_name} {last_name} – Status: {lead_status}")
 
         if delete_unqualified and lead_status == "unqualified":
-            if email in dialpad_emails:
-                try:
-                    search_res = requests.get(url, headers=headers, params={"email": email})
-                    search_res.raise_for_status()
-                    results = search_res.json().get("items", [])
-                    for contact in results:
-                        if contact.get("type") == "shared":
-                            contact_id = contact.get("id")
-                            del_res = requests.delete(f"{url}/{contact_id}", headers=headers)
-                            if del_res.status_code == 204:
-                                st.warning(f"🗑️ Deleted unqualified contact: {first_name} {last_name}")
-                                deleted_count += 1
-                            else:
-                                st.error(f"❌ Failed to delete: {del_res.status_code} {del_res.text}")
-                except Exception as e:
-                    st.error(f"❌ Error deleting contact: {e}")
+            existing = dialpad_email_map.get(email)
+            if existing:
+                contact_id = existing.get("id")
+                res = requests.delete(f"{url}/{contact_id}", headers=headers)
+                if res.status_code in (200, 204):
+                    st.warning(f"🗑️ Deleted unqualified contact: {first_name} {last_name}")
+                    deleted_count += 1
+                else:
+                    st.error(f"❌ Failed to delete {first_name} {last_name}: {res.status_code} {res.text}")
             else:
                 st.info(f"ℹ️ Unqualified contact not found in Dialpad: {first_name} {last_name}")
             continue
@@ -136,7 +129,7 @@ def push_to_dialpad(contacts, dialpad_api_key, dialpad_company_id, dialpad_email
         if not email and not phone:
             continue
 
-        if email in dialpad_emails or phone in dialpad_phones:
+        if email in dialpad_email_map or phone in dialpad_phone_map:
             st.write(f"🔁 Skipping duplicate: {first_name} {last_name}")
             continue
 
@@ -212,15 +205,15 @@ def main():
                 st.error(f"❌ Error fetching Dialpad contacts: {e}")
                 return
 
-            dialpad_emails, dialpad_phones = build_dialpad_lookup(dialpad_contacts)
+            dialpad_email_map, dialpad_phone_map = build_dialpad_lookup(dialpad_contacts)
 
             st.info("🔄 Syncing new contacts...")
             added, deleted = push_to_dialpad(
                 hubspot_contacts,
                 dialpad_api_key,
                 dialpad_company_id,
-                dialpad_emails,
-                dialpad_phones,
+                dialpad_email_map,
+                dialpad_phone_map,
                 delete_unqualified=delete_unqualified
             )
 
