@@ -166,7 +166,7 @@ def main():
         # ✅ Display the contents of the saved config.env file
         st.subheader("🔍 Saved config.env:")
         with open("config.env", "r") as f:
-        st.code(f.read(), language="dotenv")
+            st.code(f.read(), language="dotenv")
     
     if sync_schedule == "Manual (Run Now)":
         if st.button("🚀 Run Sync Now"):
