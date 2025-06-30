@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 # === Load config from config.env ===
 load_dotenv("config.env")
 
+# Print current config state
+print("🛠️ Delete feature enabled:", os.getenv("DELETE_UNQUALIFIED_CONTACTS"))
+
 # === Environment Variables ===
 HUBSPOT_API_KEY = os.getenv("HUBSPOT_API_KEY")
 DIALPAD_API_KEY = os.getenv("DIALPAD_COOLBEANS_API_KEY")
